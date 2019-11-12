@@ -148,6 +148,22 @@ describe('Test signing', () => {
         expect(typeof signature === 'string').toBe(true);
         expect(signedData instanceof Buffer).toBe(true);
     });
+    it('signs a ready pdf with pkcs11', async () => {
+        let pdfBuffer = fs.readFileSync(`${__dirname}/../resources/w3dummy.pdf`);
+        pdfBuffer = plainAddPlaceholder({
+            pdfBuffer,
+            reason: 'I have reviewed it.',
+            signatureLength: 3388
+            // signatureLength: 1612
+        });
+        pdfBuffer = signer.signWithPkcs11(pdfBuffer);
+
+        fs.writeFileSync(`${__dirname}/../resources/empty-sigpkcs11.pdf`, pdfBuffer);
+        const {signature, signedData} = extractSignature(pdfBuffer);
+        //console.log(signature.toString());
+        expect(typeof signature === 'string').toBe(true);
+        expect(signedData instanceof Buffer).toBe(true);
+    });
     it('signs a ready pdf two times', async () => {
         const secondP12Buffer = fs.readFileSync(`${__dirname}/../resources/withpass.p12`);
         let signedPdfBuffer = fs.readFileSync(`${__dirname}/../resources/signed-once.pdf`);
