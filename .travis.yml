@@ -3,6 +3,25 @@ node_js:
   - "8"
   - "10"
   - "node"
+  
+env:
+  - CXX=g++
+
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+      - llvm-toolchain-precise-3.6
+    packages:
+      - g++-4.8
+      - llvm-3.6
+      - libstdc++-4.9-dev
+      - llvm-3.6-dev
+      - clang-3.6
+
+compiler: g++
+
+#sudo: required
 sudo: false
 install: yarn install
 script:
