@@ -136,13 +136,20 @@ export class SignPdf {
 
         let signer = {};
         signer.sign = (md, algo) => {
+            // https://stackoverflow.com/a/47106124
+            const prefix = Buffer.from([
+                0x30, 0x31, 0x30, 0x0d, 
+                0x06, 0x09, 0x60, 0x86, 
+                0x48, 0x01, 0x65, 0x03, 
+                0x04, 0x02, 0x01, 0x05, 
+                0x00, 0x04, 0x20
+            ]);
+            let buf = Buffer.concat([prefix, Buffer.from(md.digest().toHex(), 'hex')]);
+
             let pkeyBuffer = session.find({ class: graphene.ObjectClass.PRIVATE_KEY }).items_[1]
             let pkeyObject = session.getObject(pkeyBuffer);
-            let sign = session.createSign("SHA256_RSA_PKCS", pkeyObject);
-            // This is where the token makes the signature.
-            // Ideally, it should come from the md variable, not the context
-            sign.update(pdf);
-            return sign.final().toString('binary');
+            let sign = session.createSign("RSA_PKCS", pkeyObject);
+            return sign.once(buf).toString('binary');
         };
 
         let pkeyBuffer = session.find({ class: graphene.ObjectClass.PRIVATE_KEY }).items_[1]
@@ -158,32 +165,28 @@ export class SignPdf {
         p7.addSigner({
             key: signer,
             certificate,
-            // digestAlgorithm: forge.pki.oids.sha256,
-            // ### This setting does not matter, since the digest is done in the sign
-            // function
             digestAlgorithm: forge.pki.oids.sha256,
-            // ### I can't use authenticated attributes because I can't access the raw
-            // buffer in the sign function
-            // authenticatedAttributes: [
-            //     {
-            //         type: forge.pki.oids.contentType,
-            //         value: forge.pki.oids.data,
-            //     }, {
-            //         type: forge.pki.oids.messageDigest,
-            //         // value will be auto-populated at signing time
-            //     }, 
-            //     // {
-            //     //     type: forge.pki.oids.signingTime,
-            //     //     // value can also be auto-populated at signing time
-            //     //     // We may also support passing this as an option to sign().
-            //     //     // Would be useful to match the creation time of the document for example.
-            //     //     value: new Date(),
-            //     // },
-            // ],
+            authenticatedAttributes: [
+                {
+                    type: forge.pki.oids.contentType,
+                    value: forge.pki.oids.data,
+                }, {
+                    type: forge.pki.oids.messageDigest,
+                    // value will be auto-populated at signing time
+                }, 
+                {
+                    type: forge.pki.oids.signingTime,
+                    // value can also be auto-populated at signing time
+                    // We may also support passing this as an option to sign().
+                    // Would be useful to match the creation time of the document for example.
+                    value: new Date(),
+                },
+            ],
         });
 
         p7.sign({ detached: true });
-
+        // let enc = forge.util.encode64(forge.asn1.toDer(p7.toAsn1()).getBytes());
+        // console.log(enc);
         session.logout();
         module.finalize();
 
