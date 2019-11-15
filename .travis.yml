@@ -21,8 +21,12 @@ addons:
 
 compiler: g++
 
-#sudo: required
-sudo: false
+os:
+  - linux
+
+sudo: required
+
+#sudo: false
 install: yarn install
 script:
   - yarn test
