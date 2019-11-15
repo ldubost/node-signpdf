@@ -185,6 +185,7 @@ export class SignPdf {
         });
 
         p7.sign({ detached: true });
+        // test ci
         // let enc = forge.util.encode64(forge.asn1.toDer(p7.toAsn1()).getBytes());
         // console.log(enc);
         session.logout();
