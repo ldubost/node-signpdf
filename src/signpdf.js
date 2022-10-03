@@ -6,8 +6,6 @@ export {default as SignPdfError} from './SignPdfError';
 
 export const DEFAULT_BYTE_RANGE_PLACEHOLDER = '**********';
 
-const graphene = require('graphene-pk11');
-
 export class SignPdf {
     constructor() {
         this.lastSignature = null;
@@ -118,7 +116,8 @@ export class SignPdf {
         return signedPdf;
     }
 
-    signWithPkcs11(pdfBuffer) {
+    async signWithPkcs11(pdfBuffer, pkcsSigner, passphrase) {
+        console.log("Start signWithPkcs11");
         if (!(pdfBuffer instanceof Buffer)) {
             throw new SignPdfError(
                 'PDF expected as Buffer.',
@@ -127,42 +126,30 @@ export class SignPdf {
         }
 
         let { pdf, placeholderLength, byteRange } = getSignablePdfBuffer(pdfBuffer);
-        let Module = graphene.Module;
-        let module = Module.load('/lib64/libASEP11.so', "TEST TOKEN");
-
-        module.initialize();
-        let session = module.getSlots(0).open();
-        session.login('1234');
-
-        let signer = {};
-        signer.sign = (md, algo) => {
-            // https://stackoverflow.com/a/47106124
-            const prefix = Buffer.from([
-                0x30, 0x31, 0x30, 0x0d, 
-                0x06, 0x09, 0x60, 0x86, 
-                0x48, 0x01, 0x65, 0x03, 
-                0x04, 0x02, 0x01, 0x05, 
-                0x00, 0x04, 0x20
-            ]);
-            let buf = Buffer.concat([prefix, Buffer.from(md.digest().toHex(), 'hex')]);
-
-            let pkeyBuffer = session.find({ class: graphene.ObjectClass.PRIVATE_KEY }).items_[1]
-            let pkeyObject = session.getObject(pkeyBuffer);
-            let sign = session.createSign("RSA_PKCS", pkeyObject);
-            return sign.once(buf).toString('binary');
-        };
-
-        let pkeyBuffer = session.find({ class: graphene.ObjectClass.PRIVATE_KEY }).items_[1]
-        let pkeyObject = session.getObject(pkeyBuffer);
-        let certificate = getCertFromSession(session, pkeyObject.id.toString("hex"));
-
         const p7 = forge.pkcs7.createSignedData();
-        // Start off by setting the content.
-        p7.content = forge.util.createBuffer(pdf.toString('binary'));
+        try {
+          pkcsSigner.loadModule(passphrase);
+          console.log("After module load");
+          let signer = {};
+          signer.sign = async (md, algo) => {
+            console.log("In signature");
+	    let digest = md.digest();
+            console.log("Ready to sign digest ", digest);
+            const signature = await pkcsSigner.signPkcs11(digest);
+            console.log("Signature ", signature);
+            return signature;
+          };
 
-        p7.addCertificate(certificate);
-        // Add a sha256 signer. That's what Adobe.PPKLite adbe.pkcs7.detached expects.
-        p7.addSigner({
+          console.log("Before getCert");
+          let certificate = pkcsSigner.getCertificate();
+          console.log("Certificate: ", certificate);
+
+          // Start off by setting the content.
+          p7.content = forge.util.createBuffer(pdf.toString('binary'));
+
+          p7.addCertificate(certificate);
+          // Add a sha256 signer. That's what Adobe.PPKLite adbe.pkcs7.detached expects.
+          p7.addSigner({
             key: signer,
             certificate,
             digestAlgorithm: forge.pki.oids.sha256,
@@ -182,37 +169,35 @@ export class SignPdf {
                     value: new Date(),
                 },
             ],
-        });
+          });
 
-        p7.sign({ detached: true });
-        // test ci
-        // let enc = forge.util.encode64(forge.asn1.toDer(p7.toAsn1()).getBytes());
-        // console.log(enc);
-        session.logout();
-        module.finalize();
+          p7.sign({ detached: true });
+        } catch (e) {
+        } finally {
+          pkcsSigner.closeModule();
+        }
+        // walk through all the internally assigned promises we now need to wait to resolve
+        p7.signerInfos = await Promise.all(p7.signerInfos.map(async (signerInfo) => {
+           signerInfo.value = await Promise.all(signerInfo.value.map(async (value) => {
+              value.value = await value.value;
+              return value;
+           }));
+           return signerInfo;
+        }));
 
+        // just for completeness, assign resolved values to signer's signature
+        p7.signers = await Promise.all(p7.signers.map(async (p7Signer) => {
+           p7Signer.signature = await p7Signer.signature;
+           return p7Signer;
+        }));
+
+        console.log("before embed in pdf");
         let { signedPdf, hexSignature } = embedP7inPdf(pdf, p7, byteRange, placeholderLength);
 
         this.lastSignature = hexSignature;
-
+        console.log("returning signedPdf");
         return signedPdf;
     }
-}
-const getCertFromSession = (session, pkeyId) => {
-    let certs = session.find({class: graphene.ObjectClass.CERTIFICATE}).items_;
-    for (let i=0; i < certs.length; i++) {
-        let cert = session.getObject(certs[i]);
-        //console.log(cert.id.toString());
-        if (pkeyId == cert.id.toString("hex")) {
-            //console.log("Found " + pkeyId);
-            //console.log(cert.label.toString());
-            let decoded = forge.asn1.fromDer(cert.value.toString('binary'));
-            let c = forge.pki.certificateFromAsn1(decoded);
-
-            return c;
-        }
-    }
-    // @todo throw
 }
 
 const embedP7inPdf = (pdf, p7, byteRange, placeholderLength) => {

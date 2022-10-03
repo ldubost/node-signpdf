@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.DEFAULT_BYTE_RANGE_PLACEHOLDER = exports.DEFAULT_SIGNATURE_LENGTH = void 0;
+exports.DEFAULT_SIGNATURE_LENGTH = exports.DEFAULT_BYTE_RANGE_PLACEHOLDER = void 0;
 const DEFAULT_SIGNATURE_LENGTH = 8192;
 exports.DEFAULT_SIGNATURE_LENGTH = DEFAULT_SIGNATURE_LENGTH;
 const DEFAULT_BYTE_RANGE_PLACEHOLDER = '**********';
