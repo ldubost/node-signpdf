@@ -1,5 +1,4 @@
-const fs = require('fs');
-const crypto = require('crypto');
+// const crypto = require('crypto');
 const forge = require('node-forge');
 const signer = require('../signpdf');
 const {
@@ -14,7 +13,7 @@ const PDFArrayCustom = require('./PDFArrayCustom');
 
 class PKCS7Sign extends Object {
 
-static extractSignature = (pdf) => {
+ extractSignature(pdf) {
     let byteRangePos = pdf.lastIndexOf("/ByteRange[");
     if (byteRangePos === -1) byteRangePos = pdf.lastIndexOf("/ByteRange [");
 
@@ -52,10 +51,9 @@ static extractSignature = (pdf) => {
     return { signature, signedData, reason, date };
 };
 
-
-static verify = (signedPDF) => {
-  const pdf = fs.readFileSync(signedPDF);
-  console.log(`**** validating file ${signedPDF} ****`);
+/*
+ verify(pdf) {
+  console.log(`**** validating file ****`);
   const extractedData = this.extractSignature(pdf);
   const p7Asn1 = forge.asn1.fromDer(extractedData.signature);
   const message = forge.pkcs7.messageFromAsn1(p7Asn1);
@@ -110,15 +108,18 @@ static verify = (signedPDF) => {
   const validContentDigest = dataDigest.toString('binary') === attrDigest;
   if(!validContentDigest) throw new Error('Wrong content digest');
   console.log('**** FILE VALID ****');
-}
+ }
+ */
 
-static mapEntityAtrributes = (attrs) => attrs.reduce((agg, { name, value }) => {
-  if (!name) return agg;
-  agg[name] = value;
-  return agg;
-}, {});
+ mapEntityAtrributes(attrs) {
+  attrs.reduce((agg, { name, value }) => {
+    if (!name) return agg;
+    agg[name] = value;
+    return agg;
+  }, {});
+ }
 
-static extractSingleCertificateDetails = (cert) => {
+ extractSingleCertificateDetails(cert) {
   const { issuer, subject, validity } = cert;
   return {
     issuedBy: this.mapEntityAtrributes(issuer.attributes),
@@ -126,9 +127,10 @@ static extractSingleCertificateDetails = (cert) => {
     validityPeriod: validity,
     pemCertificate: forge.pki.certificateToPem(cert),
   };
-};
+ };
 
-static extractCertificatesDetails = (certs) => certs
+ extractCertificatesDetails(certs) {
+  certs
   .map(this.extractSingleCertificateDetails)
   .map((cert, i) => {
     if (i) return cert;
@@ -137,18 +139,18 @@ static extractCertificatesDetails = (certs) => certs
       ...cert,
     };
   })
+ }
 
-
-static sign = async (pdfBuffer, certificate, signatureImageBytes, x, y, passphrase, pkcsSigner) => {
+ async sign(pdfBuffer, certificate, signatureImageBytes, x, y, w, h, signatureMessage, passphrase, pkcsSigner) {
   // The PDF we're going to sign
   const pdfDoc = await PDFDocument.load(pdfBuffer);
-  this.prepareSignPDFDoc(pdfDoc, signatureImageBytes, x, y);
+  this.prepareSignPDFDoc(pdfDoc, signatureImageBytes, x, y, w, h, signatureMessage);
   const modifiedPdfBytes = await pdfDoc.save({ useObjectStreams: false });
   const modifiedPdfBuffer = Buffer.from(modifiedPdfBytes);
   return await this.signPDFBuffer(modifiedPdfBuffer, certificate, passphrase, pkcsSigner); 
-}
+ }
 
-static signPDFBuffer = async (pdfBuffer, certificate, passphrase, pkcsSigner) => {
+ async signPDFBuffer(pdfBuffer, certificate, passphrase, pkcsSigner) {
   // The p12 certificate we're going to sign with
   const signObj = new signer.SignPdf();
   console.log("Before sign");
@@ -161,9 +163,9 @@ static signPDFBuffer = async (pdfBuffer, certificate, passphrase, pkcsSigner) =>
   }  
   console.log(signedPdfBuffer);
   return signedPdfBuffer;
-}
+ }
 
-static prepareSignPDFDoc = async (pdfDoc, signatureImageBytes, x, y) => {
+ async prepareSignPDFDoc(pdfDoc, signatureImageBytes, x, y, w, h) {
   // This length can be derived from the following `node-signpdf` error message:
   //   ./node_modules/node-signpdf/dist/signpdf.js:155:19
   const SIGNATURE_LENGTH = 8192;
@@ -188,8 +190,8 @@ static prepareSignPDFDoc = async (pdfDoc, signatureImageBytes, x, y) => {
   const signatureDictRef = pdfDoc.context.register(signatureDict);
   const signatureImageName = "Signature";
   const image = await pdfDoc.embedPng(signatureImageBytes);
-  const width = 50;
-  const height = 50;
+  const width = w;
+  const height = h;
   const widgetDict = pdfDoc.context.obj({
     Type: 'Annot',
     Subtype: 'Widget',
@@ -255,8 +257,6 @@ static prepareSignPDFDoc = async (pdfDoc, signatureImageBytes, x, y) => {
     widget.setNormalAppearance(streamRef);
   });
   }
-
-
 }
 
 module.exports = PKCS7Sign;

@@ -66,7 +66,6 @@ export class SignPdf {
         let certificate;
         Object.keys(certBags).forEach((i) => {
             const {publicKey} = certBags[i].cert;
-
             p7.addCertificate(certBags[i].cert);
 
             // Try to find the certificate that matches the private key.
@@ -83,6 +82,7 @@ export class SignPdf {
                 SignPdfError.TYPE_INPUT,
             );
         }
+        console.log(certificate);
 
         // Add a sha256 signer. That's what Adobe.PPKLite adbe.pkcs7.detached expects.
         p7.addSigner({
@@ -110,7 +110,7 @@ export class SignPdf {
         p7.sign({detached: true});
 
         let { signedPdf, hexSignature } = embedP7inPdf(pdf, p7, byteRange, placeholderLength);
-
+        console.log(hexSignature);
         this.lastSignature = hexSignature;
 
         return signedPdf;
@@ -128,6 +128,7 @@ export class SignPdf {
         let { pdf, placeholderLength, byteRange } = getSignablePdfBuffer(pdfBuffer);
         const p7 = forge.pkcs7.createSignedData();
         try {
+          console.log("Before module load");
           pkcsSigner.loadModule(passphrase);
           console.log("After module load");
           let signer = {};
@@ -141,7 +142,7 @@ export class SignPdf {
           };
 
           console.log("Before getCert");
-          let certificate = pkcsSigner.getCertificate();
+          let certificate = await pkcsSigner.getCertificate();
           console.log("Certificate: ", certificate);
 
           // Start off by setting the content.
@@ -173,7 +174,9 @@ export class SignPdf {
 
           p7.sign({ detached: true });
         } catch (e) {
+          console.error("Signpdf exception ", e);
         } finally {
+          console.log("Closing pkcsSigner module");
           pkcsSigner.closeModule();
         }
         // walk through all the internally assigned promises we now need to wait to resolve
@@ -195,6 +198,7 @@ export class SignPdf {
         let { signedPdf, hexSignature } = embedP7inPdf(pdf, p7, byteRange, placeholderLength);
 
         this.lastSignature = hexSignature;
+        console.log(hexSignature);
         console.log("returning signedPdf");
         return signedPdf;
     }

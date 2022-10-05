@@ -88,8 +88,9 @@ class SignPdf {
 
     if (typeof certificate === 'undefined') {
       throw new _SignPdfError.default('Failed to find a certificate that matches the private key.', _SignPdfError.default.TYPE_INPUT);
-    } // Add a sha256 signer. That's what Adobe.PPKLite adbe.pkcs7.detached expects.
+    }
 
+    console.log(certificate); // Add a sha256 signer. That's what Adobe.PPKLite adbe.pkcs7.detached expects.
 
     p7.addSigner({
       key: privateKey,
@@ -117,6 +118,7 @@ class SignPdf {
       signedPdf,
       hexSignature
     } = embedP7inPdf(pdf, p7, byteRange, placeholderLength);
+    console.log(hexSignature);
     this.lastSignature = hexSignature;
     return signedPdf;
   }
@@ -137,6 +139,7 @@ class SignPdf {
     const p7 = _nodeForge.default.pkcs7.createSignedData();
 
     try {
+      console.log("Before module load");
       pkcsSigner.loadModule(passphrase);
       console.log("After module load");
       let signer = {};
@@ -151,7 +154,7 @@ class SignPdf {
       };
 
       console.log("Before getCert");
-      let certificate = pkcsSigner.getCertificate();
+      let certificate = await pkcsSigner.getCertificate();
       console.log("Certificate: ", certificate); // Start off by setting the content.
 
       p7.content = _nodeForge.default.util.createBuffer(pdf.toString('binary'));
@@ -178,7 +181,10 @@ class SignPdf {
       p7.sign({
         detached: true
       });
-    } catch (e) {} finally {
+    } catch (e) {
+      console.error("Signpdf exception ", e);
+    } finally {
+      console.log("Closing pkcsSigner module");
       pkcsSigner.closeModule();
     } // walk through all the internally assigned promises we now need to wait to resolve
 
@@ -201,6 +207,7 @@ class SignPdf {
       hexSignature
     } = embedP7inPdf(pdf, p7, byteRange, placeholderLength);
     this.lastSignature = hexSignature;
+    console.log(hexSignature);
     console.log("returning signedPdf");
     return signedPdf;
   }

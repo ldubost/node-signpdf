@@ -17,7 +17,7 @@ class ChamberSigner extends Object {
     this.module.finalize();
  }
 
- static getCertificate = () => {
+ static getCertificate = async () => {
     let certsObj = this.session.find({class: graphene.ObjectClass.CERTIFICATE});
     let certs = certsObj.innerItems;
     let cert = this.session.getObject(certs[0]);
