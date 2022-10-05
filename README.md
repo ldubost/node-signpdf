@@ -1,4 +1,12 @@
-# node-signpdf
+# Modified version of node-signpdf to support pkcs11-token signature AND to support client side build using webpack
+
+The pkcs11-token signature process is based on the fork https://github.com/SIU-Toba/node-signpdf/tree/feature/pkcs11-token
+It has been modified to separate the signing code from the node-signpdf module.
+
+The pkcs11 token signing on the client side being not possible (browsers don't have javascript API to talk to hardware token), the signing process is going through an Firefox Web Extension and local nodejs app. The sample code for such signing on the client side is available in a CryptPad branch. The Firefox web extension and nodejs apps are available at:
+
+* Firefox Web Extension: https://github.com/ldubost/pkcs7sign-webextension-firefox
+* NodeJS Host for Web Extension: https://github.com/ldubost/pkcs7sign-host-nodesigning
 
 [![npm version](https://badge.fury.io/js/node-signpdf.svg)](https://badge.fury.io/js/node-signpdf)
 [![Build Status](https://travis-ci.com/vbuch/node-signpdf.svg?branch=master)](https://travis-ci.com/vbuch/node-signpdf)
